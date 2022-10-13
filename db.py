@@ -1,18 +1,52 @@
 # imports needed modules
 from decimal import Decimal
 from decimal import ROUND_HALF_UP
+import sqlite3
+from contextlib import closing
 
-# opens the money.txt file, reads the value, and converts it to a decimal
-try:
-    file = open("money.txt", "r")
-except FileNotFoundError as e:
-    file = input("File not found. Enter file name: ")
-    file = open(file, "r")
-moneyStr = file.read()
-money = Decimal(moneyStr).quantize(Decimal("1.00"), ROUND_HALF_UP)
+conn = None
 
 
-# writes the new value of money to money.txt
-def write():
-    wr = open("money.txt", "w")
-    wr.write(str(money))
+# connects the program to the database
+def connect():
+    global conn
+    conn = sqlite3.connect("session_db.sqlite")
+    return conn
+
+
+# disconnects the program from the database
+def close():
+    if conn:
+        conn.close()
+
+
+# finds the most recent session and returns a session object
+def getLastSession():
+    lastSession = """SELECT * FROM Session ORDER BY sessionID DESC"""
+    with closing(conn.cursor()) as c:
+        c.execute(lastSession)
+        row = c.fetchone()
+    return row
+
+
+# creates a table called Session and calls getLastSession
+def createSession():
+    global conn
+    createTable = """CREATE TABLE IF NOT EXISTS Session (sessionID INTEGER PRIMARY KEY, startTime TEXT, startMoney
+    REAL, stopTime TEXT, stopMoney REAL)"""
+    default = """INSERT INTO Session(sessionID, startTime, startMoney, stopTime, stopMoney) VALUES(0, 'x', 199, 'y', 
+    199)"""
+    c = conn.cursor()
+    c.execute(createTable)
+    session = getLastSession()
+    if session is None:
+        c.execute(default)
+        conn.commit()
+
+
+# inserts the input session into the Session table of the database
+def addSessions(s):
+    insert = """INSERT INTO Session (startTime, startMoney, stopTime, stopMoney) VALUES (?, ?, ?, ?)"""
+    with closing(conn.cursor()) as c:
+        c.execute(insert, s)
+        conn.commit()
